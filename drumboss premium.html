@@ -143,7 +143,7 @@
     { name:'Closed Hat', type:'hatC', chokeGroup:1 },
     { name:'Open Hat',   type:'hatO', chokeGroup:1 },
     { name:'Bell',       type:'bell', chokeGroup:0 },
-    { name:'Bell 2',     type:'bell', chokeGroup:0 },
+    { name:'Bell 2',     type:'bell2', chokeGroup:0 },
     { name:'Snare',      type:'snare',chokeGroup:0 },
     { name:'Kick 1',     type:'kick', chokeGroup:0, kickTier:'Mid' },
     { name:'Kick 2',     type:'kick', chokeGroup:0, kickTier:'Low' },
@@ -210,6 +210,14 @@
     startFreq: { min: 20, max: 500, default: 140 },
     endFreq: { min: 20, max: 200, default: 48 },
     click: { min: 0, max: 0.1, default: 0.008 },
+    // Bell 2
+    b2_o1_pitch: { min: -24, max: 24, default: 0 }, b2_o1_vol: { min: 0, max: 1, default: 0.5 }, b2_o1_pan: { min: -1, max: 1, default: -0.5 }, b2_o1_fmDepth: { min: 0, max: 2000, default: 440 },
+    b2_o2_pitch: { min: 0.1, max: 10, default: 2 }, b2_o2_vol: { min: 0, max: 1, default: 1.0 }, b2_o2_pan: { min: -1, max: 1, default: -0.5 }, b2_o2_amDepth: { min: 0, max: 1, default: 0.5 },
+    b2_o3_pitch: { min: 0.1, max: 10, default: 3 }, b2_o3_vol: { min: 0, max: 1, default: 1.0 }, b2_o3_pan: { min: -1, max: 1, default: -0.5 },
+    b2_o4_pitch: { min: -24, max: 24, default: 0.2 }, b2_o4_vol: { min: 0, max: 1, default: 0.5 }, b2_o4_pan: { min: -1, max: 1, default: 0.5 }, b2_o4_fmDepth: { min: 0, max: 2000, default: 440 },
+    b2_o5_pitch: { min: 0.1, max: 10, default: 2.5 }, b2_o5_vol: { min: 0, max: 1, default: 1.0 }, b2_o5_pan: { min: -1, max: 1, default: 0.5 }, b2_o5_amDepth: { min: 0, max: 1, default: 0.5 },
+    b2_o6_pitch: { min: 0.1, max: 10, default: 3.5 }, b2_o6_vol: { min: 0, max: 1, default: 1.0 }, b2_o6_pan: { min: -1, max: 1, default: 0.5 },
+    b2_rm_depth: { min: 0, max: 1, default: 0.5 }, b2_rm_freq: { min: 0.1, max: 2000, default: 30 }
   };
 
   function instrumentDefaults(t){
@@ -234,6 +242,20 @@
       case 'kick':
         return Object.assign(generic, { tier:(t.kickTier||'Mid'), startFreq:140, endFreq:48, decay:0.18,
                  fmDepth:60, fmRate:200, click:0.008, gain:0.9 });
+      case 'bell2':
+        return Object.assign(generic, {
+            decay: 2.0,
+            // Triad 1
+            b2_o1_type: 'sine', b2_o1_pitch: 0, b2_o1_vol: 0.5, b2_o1_pan: -0.5, b2_o1_fmDepth: 440,
+            b2_o2_type: 'sine', b2_o2_pitch: 2, b2_o2_vol: 1.0, b2_o2_pan: -0.5, b2_o2_amDepth: 0.5,
+            b2_o3_type: 'sine', b2_o3_pitch: 3, b2_o3_vol: 1.0, b2_o3_pan: -0.5,
+            // Triad 2
+            b2_o4_type: 'sine', b2_o4_pitch: 0.2, b2_o4_vol: 0.5, b2_o4_pan: 0.5, b2_o4_fmDepth: 440,
+            b2_o5_type: 'sine', b2_o5_pitch: 2.5, b2_o5_vol: 1.0, b2_o5_pan: 0.5, b2_o5_amDepth: 0.5,
+            b2_o6_type: 'sine', b2_o6_pitch: 3.5, b2_o6_vol: 1.0, b2_o6_pan: 0.5,
+            // Master
+            b2_rm_depth: 0.5, b2_rm_freq: 30
+        });
       default: return generic;
     }
   }
@@ -300,218 +322,214 @@
     }
   }
 
-  // Build top per-track quick controls (+ choke group)
-  function buildTopCard(track){
-    const card = document.createElement('div');
-    card.className = 'card';
-    const name = document.createElement('div'); name.className='name'; name.textContent = track.name;
-    card.appendChild(name);
-    const grid2 = document.createElement('div'); grid2.className = 'grid2';
+  const createSlider = (parent, card, track, key, label, min, max, step, unit, conv = val => val) => {
+    const wrap = document.createElement('label');
 
-    const addNum = (label, key, min, max, step, unit, conv=val=>val) => {
-      const wrap = document.createElement('label');
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+    wrap.appendChild(labelSpan);
 
-      const labelSpan = document.createElement('span');
-      labelSpan.textContent = label;
-      wrap.appendChild(labelSpan);
+    const controlWrapper = document.createElement('div');
+    controlWrapper.style.display = 'flex';
+    controlWrapper.style.alignItems = 'center';
+    controlWrapper.style.gap = '6px';
 
-      const controlWrapper = document.createElement('div');
-      controlWrapper.style.display = 'flex';
-      controlWrapper.style.alignItems = 'center';
-      controlWrapper.style.gap = '6px';
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = min;
+    slider.max = max;
+    slider.step = step;
+    slider.value = track.params[key];
+    slider.classList.add('wide');
 
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = min;
-      slider.max = max;
-      slider.step = step;
-      slider.value = track.params[key];
-      slider.classList.add('wide');
+    const valueSpan = document.createElement('span');
+    let initialPrecision = 0;
+    if (step < 1 && step > 0) {
+      initialPrecision = (step.toString().split('.')[1] || '').length;
+    }
+    valueSpan.textContent = parseFloat(slider.value).toFixed(initialPrecision);
+    valueSpan.className = 'small';
+    valueSpan.style.width = '35px';
+    valueSpan.style.textAlign = 'right';
 
-      const valueSpan = document.createElement('span');
-      let initialPrecision = 0;
+    slider.addEventListener('input', () => {
+      const val = parseFloat(slider.value);
+      track.params[key] = conv(val);
+      let precision = 0;
       if (step < 1 && step > 0) {
-        initialPrecision = (step.toString().split('.')[1] || '').length;
+          precision = (step.toString().split('.')[1] || '').length;
       }
-      valueSpan.textContent = parseFloat(slider.value).toFixed(initialPrecision);
-      valueSpan.className = 'small';
-      valueSpan.style.width = '35px';
-      valueSpan.style.textAlign = 'right';
-
-      slider.addEventListener('input', () => {
-        const val = parseFloat(slider.value);
-        track.params[key] = conv(val);
-        let precision = 0;
-        if (step < 1 && step > 0) {
-            precision = (step.toString().split('.')[1] || '').length;
-        }
-        valueSpan.textContent = val.toFixed(precision);
-      });
-
-      slider.addEventListener('focus', () => card.classList.add('expanded'));
-      slider.addEventListener('blur', () => card.classList.remove('expanded'));
-
-      controlWrapper.appendChild(slider);
-      controlWrapper.appendChild(valueSpan);
-      if (unit) {
-        const unitSpan = document.createElement('span');
-        unitSpan.textContent = unit;
-        unitSpan.className = 'small';
-        unitSpan.style.width = '20px';
-        controlWrapper.appendChild(unitSpan);
-      }
-
-      wrap.appendChild(controlWrapper);
-      grid2.appendChild(wrap);
-
-      wrap.addEventListener('click', () => handleModParamSelect(key));
-      return slider;
-    };
-    const addRange = (label, key, min, max, step, wide=false) => {
-      const wrap = document.createElement('label');
-
-      const labelSpan = document.createElement('span');
-      labelSpan.textContent = label;
-      wrap.appendChild(labelSpan);
-
-      const controlWrapper = document.createElement('div');
-      controlWrapper.style.display = 'flex';
-      controlWrapper.style.alignItems = 'center';
-      controlWrapper.style.gap = '6px';
-
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = min;
-      slider.max = max;
-      slider.step = step;
-      slider.value = track.params[key];
-      if (wide) slider.classList.add('wide');
-
-      const valueSpan = document.createElement('span');
-      let initialPrecision = 0;
-      if (step < 1 && step > 0) {
-        initialPrecision = (step.toString().split('.')[1] || '').length;
-      }
-      valueSpan.textContent = parseFloat(slider.value).toFixed(initialPrecision);
-      valueSpan.className = 'small';
-      valueSpan.style.width = '35px';
-      valueSpan.style.textAlign = 'right';
-
-      slider.addEventListener('input', () => {
-        const val = parseFloat(slider.value);
-        track.params[key] = val;
-        let precision = 0;
-        if (step < 1 && step > 0) {
-            precision = (step.toString().split('.')[1] || '').length;
-        }
-        valueSpan.textContent = val.toFixed(precision);
-      });
-
-      slider.addEventListener('focus', () => card.classList.add('expanded'));
-      slider.addEventListener('blur', () => card.classList.remove('expanded'));
-
-      controlWrapper.appendChild(slider);
-      controlWrapper.appendChild(valueSpan);
-
-      wrap.appendChild(controlWrapper);
-      grid2.appendChild(wrap);
-
-      wrap.addEventListener('click', () => handleModParamSelect(key));
-      return slider;
-    };
-
-    addNum('Pitch','pitchSemis',-24,24,1,'st');
-    addNum('Cutoff','cutoff',200,20000,10,'Hz');
-    addNum('Resonance','resonance',0.1,12,0.1,'Q');
-    addNum('FM Depth','fmDepthG',0,800,1,'');
-    addNum('FM Rate','fmRateG',0,2000,1,'Hz');
-    addNum('FM Feedback','fmFeedback',0,800,1,'');
-    addRange('Ring Amt','rmAmt',0,1,0.01,true);
-    addNum('Ring Rate','rmRate',0.1,2000,0.1,'Hz');
-
-    const ringTypeWrap = document.createElement('label');
-    ringTypeWrap.textContent = 'Ring Type';
-    const selRing = document.createElement('select');
-    ['sine', 'square', 'sawtooth', 'triangle'].forEach(type => {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = type;
-        selRing.appendChild(opt);
+      valueSpan.textContent = val.toFixed(precision);
     });
-    selRing.value = track.params.rmType || 'sine';
-    selRing.addEventListener('change', () => track.params.rmType = selRing.value);
-    ringTypeWrap.appendChild(selRing);
-    grid2.appendChild(ringTypeWrap);
 
-    addRange('Gain', 'gain', 0, 1.5, 0.01, true);
+    slider.addEventListener('focus', () => card.classList.add('expanded'));
+    slider.addEventListener('blur', () => card.classList.remove('expanded'));
 
-    // Choke group 0..5
-    const chokeWrap = document.createElement('label'); chokeWrap.textContent='Choke grp';
-    const sel = document.createElement('select');
-    [['0','None'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']].forEach(([v,t])=>{
-      const opt=document.createElement('option'); opt.value=v; opt.textContent=t; sel.appendChild(opt);
-    });
-    sel.value = String(track.params.chokeGroup||0);
-    sel.addEventListener('change', ()=> track.params.chokeGroup = parseInt(sel.value,10));
-    chokeWrap.appendChild(sel); grid2.appendChild(chokeWrap);
-
-    // Instrument specific controls
-    const type = track.type;
-    if (type === 'hatC' || type === 'hatO') {
-        addNum('Decay', 'decay', 0.01, 2.0, 0.01, 's');
-        addNum('BP Freq', 'bpFreq', 1000, 15000, 100, 'Hz');
-        addNum('BP Q', 'bpQ', 0.1, 10, 0.1, '');
-        addNum('HP Freq', 'hpFreq', 1000, 15000, 100, 'Hz');
-        addRange('Tone', 'tone', 0.1, 1.0, 0.01, true);
-    } else if (type === 'bell') {
-        addNum('Freq', 'freq', 100, 2000, 10, 'Hz');
-        addNum('Ratio', 'ratio', 0.1, 5, 0.1, '');
-        addNum('Mod Index', 'modIndex', 10, 2000, 10, '');
-        addNum('Decay', 'decay', 0.1, 6.0, 0.1, 's');
-    } else if (type === 'snare') {
-        addNum('Body Freq', 'bodyFreq', 50, 500, 5, 'Hz');
-        addNum('Body Decay', 'bodyDecay', 0.01, 1.0, 0.01, 's');
-        addNum('Noise Len', 'noiseLen', 0.01, 1.0, 0.01, 's');
-        addNum('BP Freq', 'bpFreq', 500, 8000, 100, 'Hz');
-        addNum('BP Q', 'bpQ', 0.1, 10, 0.1, '');
-        addNum('HP Freq', 'hpFreq', 500, 8000, 100, 'Hz');
-        addNum('Filt Env Amt', 'filtEnvAmt', 0, 5000, 100, '');
-        addNum('Filt Env Time', 'filtEnvTime', 0.01, 0.5, 0.01, 's');
-        addNum('FM Depth', 'fmDepth', 0, 200, 5, '');
-        addNum('FM Rate', 'fmRate', 0, 500, 5, 'Hz');
-        addRange('Ring Noise', 'ringNoiseAmt', 0, 1, 0.01, true);
-    } else if (type === 'kick') {
-        const tierWrap = document.createElement('label');
-        tierWrap.textContent = 'Tier';
-        const tierSel = document.createElement('select');
-        ['Low', 'Mid', 'High'].forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
-            tierSel.appendChild(opt);
-        });
-        tierSel.value = track.params.tier || 'Mid';
-        tierSel.addEventListener('change', () => track.params.tier = tierSel.value);
-        tierWrap.appendChild(tierSel);
-        grid2.appendChild(tierWrap);
-
-        addNum('Start Freq', 'startFreq', 20, 500, 10, 'Hz');
-        addNum('End Freq', 'endFreq', 20, 200, 5, 'Hz');
-        addNum('Decay', 'decay', 0.01, 1.0, 0.01, 's');
-        addNum('FM Depth', 'fmDepth', 0, 200, 5, '');
-        addNum('FM Rate', 'fmRate', 0, 500, 5, 'Hz');
-        addNum('Click', 'click', 0, 0.1, 0.001, 's');
+    controlWrapper.appendChild(slider);
+    controlWrapper.appendChild(valueSpan);
+    if (unit) {
+      const unitSpan = document.createElement('span');
+      unitSpan.textContent = unit;
+      unitSpan.className = 'small';
+      unitSpan.style.width = '20px';
+      controlWrapper.appendChild(unitSpan);
     }
 
-    card.appendChild(grid2);
+    wrap.appendChild(controlWrapper);
+    parent.appendChild(wrap);
+
+    wrap.addEventListener('click', () => handleModParamSelect(key));
+    return slider;
+  };
+
+  function buildTopCard(track) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = track.name;
+    card.appendChild(name);
+
+    if (track.type === 'bell2') {
+        card.style.minWidth = '710px';
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = '1fr 1fr 1fr';
+        grid.style.gap = '10px';
+
+        const createSection = (title) => {
+            const section = document.createElement('div');
+            section.style.display = 'flex';
+            section.style.flexDirection = 'column';
+            section.style.gap = '4px';
+            const header = document.createElement('h6');
+            header.textContent = title;
+            header.style.margin = '0 0 4px 0';
+            header.style.fontSize = '12px';
+            header.style.borderBottom = '1px solid #999';
+            section.appendChild(header);
+            return section;
+        }
+
+        const triad1 = createSection('Triad 1 (Osc 1-3)');
+        createSlider(triad1, card, track, 'b2_o1_pitch', 'O1 Pitch', -24, 24, 1, 'st');
+        createSlider(triad1, card, track, 'b2_o1_vol', 'O1 Vol', 0, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o1_pan', 'O1 Pan', -1, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o1_fmDepth', 'O1 FM Depth', 0, 2000, 10);
+        createSlider(triad1, card, track, 'b2_o2_pitch', 'O2 Pitch', 0.1, 10, 0.1);
+        createSlider(triad1, card, track, 'b2_o2_vol', 'O2 Vol', 0, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o2_pan', 'O2 Pan', -1, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o2_amDepth', 'O2 AM Depth', 0, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o3_pitch', 'O3 Pitch', 0.1, 10, 0.1);
+        createSlider(triad1, card, track, 'b2_o3_vol', 'O3 Vol', 0, 1, 0.01);
+        createSlider(triad1, card, track, 'b2_o3_pan', 'O3 Pan', -1, 1, 0.01);
+
+        const triad2 = createSection('Triad 2 (Osc 4-6)');
+        createSlider(triad2, card, track, 'b2_o4_pitch', 'O4 Pitch', -24, 24, 1, 'st');
+        createSlider(triad2, card, track, 'b2_o4_vol', 'O4 Vol', 0, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o4_pan', 'O4 Pan', -1, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o4_fmDepth', 'O4 FM Depth', 0, 2000, 10);
+        createSlider(triad2, card, track, 'b2_o5_pitch', 'O5 Pitch', 0.1, 10, 0.1);
+        createSlider(triad2, card, track, 'b2_o5_vol', 'O5 Vol', 0, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o5_pan', 'O5 Pan', -1, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o5_amDepth', 'O5 AM Depth', 0, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o6_pitch', 'O6 Pitch', 0.1, 10, 0.1);
+        createSlider(triad2, card, track, 'b2_o6_vol', 'O6 Vol', 0, 1, 0.01);
+        createSlider(triad2, card, track, 'b2_o6_pan', 'O6 Pan', -1, 1, 0.01);
+
+        const master = createSection('Master');
+        createSlider(master, card, track, 'decay', 'Decay', 0.1, 5, 0.1, 's');
+        createSlider(master, card, track, 'b2_rm_depth', 'RM Depth', 0, 1, 0.01);
+        createSlider(master, card, track, 'b2_rm_freq', 'RM Freq', 0.1, 2000, 1, 'Hz');
+
+        grid.appendChild(triad1);
+        grid.appendChild(triad2);
+        grid.appendChild(master);
+        card.appendChild(grid);
+    } else {
+        const grid2 = document.createElement('div');
+        grid2.className = 'grid2';
+
+        const addNum = (label, key, min, max, step, unit) => createSlider(grid2, card, track, key, label, min, max, step, unit);
+        const addRange = (label, key, min, max, step) => createSlider(grid2, card, track, key, label, min, max, step);
+
+        addNum('Pitch','pitchSemis',-24,24,1,'st');
+        addNum('Cutoff','cutoff',200,20000,10,'Hz');
+        addNum('Resonance','resonance',0.1,12,0.1,'Q');
+        addNum('FM Depth','fmDepthG',0,800,1,'');
+        addNum('FM Rate','fmRateG',0,2000,1,'Hz');
+        addNum('FM Feedback','fmFeedback',0,800,1,'');
+        addRange('Ring Amt','rmAmt',0,1,0.01,true);
+        addNum('Ring Rate','rmRate',0.1,2000,0.1,'Hz');
+
+        const ringTypeWrap = document.createElement('label');
+        ringTypeWrap.textContent = 'Ring Type';
+        const selRing = document.createElement('select');
+        ['sine', 'square', 'sawtooth', 'triangle'].forEach(type => {
+            const opt = document.createElement('option');
+            opt.value = type;
+            opt.textContent = type;
+            selRing.appendChild(opt);
+        });
+        selRing.value = track.params.rmType || 'sine';
+        selRing.addEventListener('change', () => track.params.rmType = selRing.value);
+        ringTypeWrap.appendChild(selRing);
+        grid2.appendChild(ringTypeWrap);
+
+        addRange('Gain', 'gain', 0, 1.5, 0.01, true);
+
+        const chokeWrap = document.createElement('label'); chokeWrap.textContent='Choke grp';
+        const sel = document.createElement('select');
+        [['0','None'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']].forEach(([v,t])=>{
+          const opt=document.createElement('option'); opt.value=v; opt.textContent=t; sel.appendChild(opt);
+        });
+        sel.value = String(track.params.chokeGroup||0);
+        sel.addEventListener('change', ()=> track.params.chokeGroup = parseInt(sel.value,10));
+        chokeWrap.appendChild(sel); grid2.appendChild(chokeWrap);
+
+        const type = track.type;
+        if (type === 'hatC' || type === 'hatO') {
+            addNum('Decay', 'decay', 0.01, 2.0, 0.01, 's');
+            addNum('BP Freq', 'bpFreq', 1000, 15000, 100, 'Hz');
+            addNum('BP Q', 'bpQ', 0.1, 10, 0.1, '');
+            addNum('HP Freq', 'hpFreq', 1000, 15000, 100, 'Hz');
+            addRange('Tone', 'tone', 0.1, 1.0, 0.01, true);
+        } else if (type === 'bell') {
+            addNum('Freq', 'freq', 100, 2000, 10, 'Hz');
+            addNum('Ratio', 'ratio', 0.1, 5, 0.1, '');
+            addNum('Mod Index', 'modIndex', 10, 2000, 10, '');
+            addNum('Decay', 'decay', 0.1, 6.0, 0.1, 's');
+        } else if (type === 'snare') {
+            addNum('Body Freq', 'bodyFreq', 50, 500, 5, 'Hz');
+            addNum('Body Decay', 'bodyDecay', 0.01, 1.0, 0.01, 's');
+            addNum('Noise Len', 'noiseLen', 0.01, 1.0, 0.01, 's');
+            addNum('BP Freq', 'bpFreq', 500, 8000, 100, 'Hz');
+            addNum('BP Q', 'bpQ', 0.1, 10, 0.1, '');
+            addNum('HP Freq', 'hpFreq', 500, 8000, 100, 'Hz');
+            addNum('Filt Env Amt', 'filtEnvAmt', 0, 5000, 100, '');
+            addNum('Filt Env Time', 'filtEnvTime', 0.01, 0.5, 0.01, 's');
+            addNum('FM Depth', 'fmDepth', 0, 200, 5, '');
+            addNum('FM Rate', 'fmRate', 0, 500, 5, 'Hz');
+            addRange('Ring Noise', 'ringNoiseAmt', 0, 1, 0.01, true);
+        } else if (type === 'kick') {
+            addNum('Start Freq', 'startFreq', 20, 500, 10, 'Hz');
+            addNum('End Freq', 'endFreq', 20, 200, 5, 'Hz');
+            addNum('Decay', 'decay', 0.01, 1.0, 0.01, 's');
+            addNum('FM Depth', 'fmDepth', 0, 200, 5, '');
+            addNum('FM Rate', 'fmRate', 0, 500, 5, 'Hz');
+            addNum('Click', 'click', 0, 0.1, 0.001, 's');
+        }
+
+        card.appendChild(grid2);
+    }
     return card;
   }
 
   const layout = [
     ['Closed Hat', 'Open Hat'],
-    ['Bell', 'Bell 2'],
     ['Kick 1', 'Kick 2'],
-    ['Snare']
+    ['Bell', 'Snare'],
+    ['Bell 2']
   ];
 
   layout.forEach(rowNames => {
@@ -867,6 +885,7 @@
       case 'hatC': return playHat(track, when, false, velocity, stepIndex);
       case 'hatO': return playHat(track, when, true,  velocity, stepIndex);
       case 'bell': return playBell(track, when, velocity, stepIndex);
+      case 'bell2': return playBell2(track, when, velocity, stepIndex);
       case 'snare':return playSnare(track, when, velocity, stepIndex);
       case 'kick': return playKick(track, when, velocity, stepIndex);
     }
@@ -928,6 +947,93 @@
       }
     }
     return modulatedParams;
+  }
+
+  function playBell2(track, when, vel, stepIndex) {
+    const p = applyModulations(track, stepIndex);
+    const mul = pitchMul(p);
+    const dur = p.decay;
+    const stopAt = when + dur;
+
+    const createTriad = (nums) => {
+        const [c_n, f_n, a_n] = nums;
+        // Base frequency calculation assumes 'pitch' is in semitones from A4 (69)
+        const baseFreq = 440 * Math.pow(2, (p[`b2_o${c_n}_pitch`] + p.pitchSemis - 69) / 12);
+
+        // Oscillators
+        const carrier = audioCtx.createOscillator(); carrier.type = p[`b2_o${c_n}_type`] || 'sine';
+        const fm_osc = audioCtx.createOscillator();   fm_osc.type = p[`b2_o${f_n}_type`] || 'sine';
+        const am_osc = audioCtx.createOscillator();   am_osc.type = p[`b2_o${a_n}_type`] || 'sine';
+        carrier.frequency.setValueAtTime(baseFreq * mul, when);
+        // FM/AM osc pitch are treated as direct frequencies in Hz
+        fm_osc.frequency.setValueAtTime(p[`b2_o${f_n}_pitch`], when);
+        am_osc.frequency.setValueAtTime(p[`b2_o${a_n}_pitch`], when);
+
+        // AM stage (osc3 modulates gain of osc2)
+        const am_stage = audioCtx.createGain();
+        am_stage.gain.value = 0.5; // Set to 0.5 to allow for bipolar modulation
+        const am_mod = audioCtx.createGain();
+        am_mod.gain.value = p[`b2_o${f_n}_amDepth`] * 0.5;
+        fm_osc.connect(am_stage);
+        am_osc.connect(am_mod).connect(am_stage.gain);
+
+        // FM stage (AM-modulated osc2 modulates freq of carrier)
+        const fm_mod = audioCtx.createGain();
+        fm_mod.gain.value = p[`b2_o${c_n}_fmDepth`];
+        am_stage.connect(fm_mod);
+        fm_mod.connect(carrier.frequency);
+
+        // Output stage
+        const out_gain = audioCtx.createGain();
+        out_gain.gain.value = p[`b2_o${c_n}_vol`] * vel;
+        const panner = audioCtx.createStereoPanner();
+        panner.pan.value = p[`b2_o${c_n}_pan`];
+        carrier.connect(out_gain).connect(panner);
+
+        return {
+            output: panner,
+            nodes: [carrier, fm_osc, am_osc]
+        };
+    };
+
+    const triad1 = createTriad([1, 2, 3]);
+    const triad2 = createTriad([4, 5, 6]);
+
+    const mix = audioCtx.createGain();
+    triad1.output.connect(mix);
+    triad2.output.connect(mix);
+
+    // Final Ring Modulator
+    const rm_mod = audioCtx.createOscillator();
+    rm_mod.type = 'sine';
+    rm_mod.frequency.setValueAtTime(p.b2_rm_freq, when);
+    const rm_gain = audioCtx.createGain();
+    rm_gain.gain.value = p.b2_rm_depth;
+    rm_mod.connect(rm_gain);
+
+    const rm_stage = audioCtx.createGain();
+    rm_stage.gain.value = 0; // Set to 0 to allow for bipolar modulation
+    mix.connect(rm_stage);
+    rm_gain.connect(rm_stage.gain);
+
+    // Master Output
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.setValueAtTime(p.gain, when);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
+    rm_stage.connect(masterGain);
+
+    const fx = channelFX(p, when, stopAt);
+    const voice = createVoiceGate(when, stopAt);
+    masterGain.connect(voice.gate).connect(fx.in);
+
+    // Start and Stop all nodes
+    [...triad1.nodes, ...triad2.nodes, rm_mod].forEach(o => {
+        o.start(when);
+        o.stop(stopAt);
+    });
+
+    return voice;
   }
 
   function playHat(track, when, isOpen, vel, stepIndex){
