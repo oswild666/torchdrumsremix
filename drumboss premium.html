@@ -48,6 +48,10 @@
   .card{
     min-width:420px;background:#f7f4ec;border:1px solid #000;
     box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #555; padding:6px;
+    transition: min-width 0.2s ease-in-out;
+  }
+  .card.expanded {
+    min-width: 500px;
   }
   .card .name{font-weight:bold;margin-bottom:4px;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
@@ -155,9 +159,10 @@
     stepIndex:0,
     nextTime:0,
     swingFirst:true, // первая 16‑я в паре
+    maxSteps: t.type === 'bell' ? 96 : 32,
     // Pattern: velocity per step (0..1). 0 = off
     modulations: {
-      velocity: Array(32).fill(0)
+      velocity: Array(t.type === 'bell' ? 96 : 32).fill(0)
     },
     // UI state for modulation
     isModSelectionMode: false,
@@ -280,7 +285,7 @@
       const info = paramInfo[paramKey];
       const baseValue = modTrack.params[paramKey] ?? info.default;
       const defaultValue = (baseValue - info.min) / (info.max - info.min);
-      modTrack.modulations[paramKey] = Array(32).fill(defaultValue);
+      modTrack.modulations[paramKey] = Array(modTrack.maxSteps).fill(defaultValue);
 
       // Update the track's UI
       modTrack.currentModulationView = paramKey;
@@ -302,26 +307,115 @@
     const grid2 = document.createElement('div'); grid2.className = 'grid2';
 
     const addNum = (label, key, min, max, step, unit, conv=val=>val) => {
-      const wrap = document.createElement('label'); wrap.textContent = label;
-      const input = document.createElement('input'); input.type='number';
-      input.min=min; input.max=max; input.step=step; input.value=track.params[key];
-      input.style.width='70px';
-      input.addEventListener('input', ()=> track.params[key]=conv(parseFloat(input.value)));
-      wrap.appendChild(input);
-      if (unit){ const u = document.createElement('span'); u.textContent = unit; wrap.appendChild(u); }
+      const wrap = document.createElement('label');
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = label;
+      wrap.appendChild(labelSpan);
+
+      const controlWrapper = document.createElement('div');
+      controlWrapper.style.display = 'flex';
+      controlWrapper.style.alignItems = 'center';
+      controlWrapper.style.gap = '6px';
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = min;
+      slider.max = max;
+      slider.step = step;
+      slider.value = track.params[key];
+      slider.classList.add('wide');
+
+      const valueSpan = document.createElement('span');
+      let initialPrecision = 0;
+      if (step < 1 && step > 0) {
+        initialPrecision = (step.toString().split('.')[1] || '').length;
+      }
+      valueSpan.textContent = parseFloat(slider.value).toFixed(initialPrecision);
+      valueSpan.className = 'small';
+      valueSpan.style.width = '35px';
+      valueSpan.style.textAlign = 'right';
+
+      slider.addEventListener('input', () => {
+        const val = parseFloat(slider.value);
+        track.params[key] = conv(val);
+        let precision = 0;
+        if (step < 1 && step > 0) {
+            precision = (step.toString().split('.')[1] || '').length;
+        }
+        valueSpan.textContent = val.toFixed(precision);
+      });
+
+      slider.addEventListener('focus', () => card.classList.add('expanded'));
+      slider.addEventListener('blur', () => card.classList.remove('expanded'));
+
+      controlWrapper.appendChild(slider);
+      controlWrapper.appendChild(valueSpan);
+      if (unit) {
+        const unitSpan = document.createElement('span');
+        unitSpan.textContent = unit;
+        unitSpan.className = 'small';
+        unitSpan.style.width = '20px';
+        controlWrapper.appendChild(unitSpan);
+      }
+
+      wrap.appendChild(controlWrapper);
       grid2.appendChild(wrap);
+
       wrap.addEventListener('click', () => handleModParamSelect(key));
-      return input;
+      return slider;
     };
     const addRange = (label, key, min, max, step, wide=false) => {
-      const wrap = document.createElement('label'); wrap.textContent=label;
-      const rng=document.createElement('input'); rng.type='range';
-      rng.min=min; rng.max=max; rng.step=step; rng.value=track.params[key];
-      if (wide) rng.classList.add('wide');
-      rng.addEventListener('input', ()=> track.params[key]=parseFloat(rng.value));
-      wrap.appendChild(rng); grid2.appendChild(wrap);
+      const wrap = document.createElement('label');
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = label;
+      wrap.appendChild(labelSpan);
+
+      const controlWrapper = document.createElement('div');
+      controlWrapper.style.display = 'flex';
+      controlWrapper.style.alignItems = 'center';
+      controlWrapper.style.gap = '6px';
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = min;
+      slider.max = max;
+      slider.step = step;
+      slider.value = track.params[key];
+      if (wide) slider.classList.add('wide');
+
+      const valueSpan = document.createElement('span');
+      let initialPrecision = 0;
+      if (step < 1 && step > 0) {
+        initialPrecision = (step.toString().split('.')[1] || '').length;
+      }
+      valueSpan.textContent = parseFloat(slider.value).toFixed(initialPrecision);
+      valueSpan.className = 'small';
+      valueSpan.style.width = '35px';
+      valueSpan.style.textAlign = 'right';
+
+      slider.addEventListener('input', () => {
+        const val = parseFloat(slider.value);
+        track.params[key] = val;
+        let precision = 0;
+        if (step < 1 && step > 0) {
+            precision = (step.toString().split('.')[1] || '').length;
+        }
+        valueSpan.textContent = val.toFixed(precision);
+      });
+
+      slider.addEventListener('focus', () => card.classList.add('expanded'));
+      slider.addEventListener('blur', () => card.classList.remove('expanded'));
+
+      controlWrapper.appendChild(slider);
+      controlWrapper.appendChild(valueSpan);
+
+      wrap.appendChild(controlWrapper);
+      grid2.appendChild(wrap);
+
       wrap.addEventListener('click', () => handleModParamSelect(key));
-      return rng;
+      return slider;
     };
 
     addNum('Pitch','pitchSemis',-24,24,1,'st');
@@ -427,7 +521,7 @@
 
     const lenLabel = document.createElement('label'); lenLabel.textContent = 'Len';
     const lenSel = document.createElement('select');
-    for (let i=1;i<=32;i++){
+    for (let i=1;i<=track.maxSteps;i++){
       const opt = document.createElement('option'); opt.value=String(i); opt.textContent=String(i);
       if (i===track.patternLen) opt.selected=true; lenSel.appendChild(opt);
     }
@@ -497,7 +591,7 @@
       const currentMod = track.currentModulationView;
       const modData = track.modulations[currentMod];
 
-      for (let r=0;r<32;r++){
+      for (let r=0;r<track.maxSteps;r++){
         const row = document.createElement('div'); row.className='row'; row.dataset.row=r;
         const idx = document.createElement('div'); idx.className='idx'; idx.textContent=(r+1).toString().padStart(2,'0');
         const cellOn = document.createElement('div'); cellOn.className='cell';
